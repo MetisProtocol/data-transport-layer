@@ -66,6 +66,7 @@ export const handleEventsSequencerBatchAppended: EventHandlerSet<
     ).find((foundEvent: ethers.Event) => {
       // We might have more than one event in this block, so we specifically want to find a
       // "TransactonBatchAppended" event emitted immediately before the event in question.
+      //TODO filter chainId
       return (
         foundEvent.transactionHash === event.transactionHash &&
         foundEvent.logIndex === event.logIndex - 1

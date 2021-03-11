@@ -11,6 +11,7 @@ export interface EventArgsAddressSet {
 }
 
 export interface EventArgsTransactionEnqueued {
+  _chainId: ethers.BigNumber
   _l1TxOrigin: string
   _target: string
   _gasLimit: ethers.BigNumber
@@ -20,6 +21,7 @@ export interface EventArgsTransactionEnqueued {
 }
 
 export interface EventArgsTransactionBatchAppended {
+  _chainId: ethers.BigNumber
   _batchIndex: ethers.BigNumber
   _batchRoot: string
   _batchSize: ethers.BigNumber
@@ -28,6 +30,7 @@ export interface EventArgsTransactionBatchAppended {
 }
 
 export interface EventArgsStateBatchAppended {
+  _chainId: ethers.BigNumber
   _batchIndex: ethers.BigNumber
   _batchRoot: string
   _batchSize: ethers.BigNumber
@@ -36,6 +39,7 @@ export interface EventArgsStateBatchAppended {
 }
 
 export interface EventArgsSequencerBatchAppended {
+  _chainId: ethers.BigNumber
   _startingQueueIndex: ethers.BigNumber
   _numQueueElements: ethers.BigNumber
   _totalElements: ethers.BigNumber
