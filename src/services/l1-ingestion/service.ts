@@ -61,6 +61,9 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
         return validators.isUrl(val) || validators.isJsonRpcProvider(val)
       },
     },
+    l2ChainId: {
+      validate: validators.isInteger,
+    },
   }
 
   private state: {
@@ -291,6 +294,11 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
         const tick = Date.now()
 
         for (const event of events) {
+          // filter chainId
+          if(!event.args._chainId || event.args._chainId != this.options.l2ChainId){
+            continue;
+          }
+
           const extraData = await handlers.getExtraData(
             event,
             this.state.l1RpcProvider
