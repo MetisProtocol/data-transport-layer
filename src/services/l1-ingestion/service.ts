@@ -30,6 +30,7 @@ export interface L1IngestionServiceOptions {
   pollingInterval: number
   logsPerPollingInterval: number
   dangerouslyCatchAllErrors?: boolean
+  l2ChainId: number
 }
 
 export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
@@ -62,6 +63,9 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
       validate: (val: any) => {
         return validators.isUrl(val) || validators.isJsonRpcProvider(val)
       },
+    },
+    l2ChainId: {
+      validate: validators.isInteger,
     },
   }
 
@@ -294,6 +298,11 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
         const tick = Date.now()
 
         for (const event of events) {
+          // filter chainId
+          if(!event.args._chainId || event.args._chainId != this.options.l2ChainId){
+            continue;
+          }
+
           const extraData = await handlers.getExtraData(
             event,
             this.state.l1RpcProvider
