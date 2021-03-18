@@ -1,6 +1,7 @@
 /db/
 node_modules/
 yarn-error.log
+yarn.lock
 .env
 test/temp/
 build/
