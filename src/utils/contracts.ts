@@ -1,7 +1,8 @@
 /* Imports: External */
 import { constants, Contract, Signer } from 'ethers'
 import { JsonRpcProvider } from '@ethersproject/providers'
-import { getContractInterface } from '@eth-optimism/contracts/build/src/contract-defs'
+import { getContractInterface } from 'metiseth-optimism-contracts/build/src/contract-defs'
+import { ZERO_ADDRESS } from '@eth-optimism/core-utils'
 
 export const loadContract = (
   name: string,
