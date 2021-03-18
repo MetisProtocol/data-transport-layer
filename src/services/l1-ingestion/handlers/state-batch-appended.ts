@@ -1,5 +1,5 @@
 /* Imports: External */
-import { getContractFactory } from '@eth-optimism/contracts'
+import { getContractFactory } from 'metiseth-optimism-contracts'
 import { BigNumber } from 'ethers'
 
 /* Imports: Internal */
