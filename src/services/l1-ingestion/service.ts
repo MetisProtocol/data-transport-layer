@@ -158,9 +158,11 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
           highestSyncedL1Block + this.options.logsPerPollingInterval,
           currentL1Block - this.options.confirmations
         )
+        this.logger.info("start check...");
 
         // We're already at the head, so no point in attempting to sync.
         if (highestSyncedL1Block === targetL1Block) {
+          this.logger.info("no need to sync,sleep:"+this.options.pollingInterval);
           await sleep(this.options.pollingInterval)
           continue
         }
@@ -180,7 +182,7 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
           targetL1Block,
           handleEventsTransactionEnqueued
         )
-
+        this.logger.info("TransactionEnqueued");
         await this._syncEvents(
           'OVM_CanonicalTransactionChain',
           'SequencerBatchAppended',
@@ -188,6 +190,7 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
           targetL1Block,
           handleEventsSequencerBatchAppended
         )
+        this.logger.info("SequencerBatchAppended");
 
         await this._syncEvents(
           'OVM_StateCommitmentChain',
@@ -196,8 +199,10 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
           targetL1Block,
           handleEventsStateBatchAppended
         )
+        this.logger.info("StateBatchAppended");
 
         await this.state.db.setHighestSyncedL1Block(targetL1Block)
+        this.logger.info("setHighestSyncedL1Block");
 
         if (
           currentL1Block - highestSyncedL1Block <
@@ -205,6 +210,7 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
         ) {
           await sleep(this.options.pollingInterval)
         }
+        this.logger.info("pollingInterval");
       } catch (err) {
         if (!this.running || this.options.dangerouslyCatchAllErrors) {
           this.logger.error('Caught an unhandled error', { err })
