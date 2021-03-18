@@ -22,9 +22,9 @@
     "build": "tsc -p ."
   },
   "dependencies": {
-    "@eth-optimism/core-utils": "0.1.9",
-    "@eth-optimism/service-base": "1.1.5",
-    "metiseth-optimism-contracts": "^0.1.6",
+    "metiseth-optimism-contracts": "^1.0.0",
+    "@eth-optimism/core-utils": "^0.1.5",
+    "@eth-optimism/service-base": "^1.1.1",
     "@ethersproject/providers": "^5.0.21",
     "@types/express": "^4.17.11",
     "bcfg": "^0.1.6",
