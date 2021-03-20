@@ -33,7 +33,7 @@
     "ethers": "^5.0.26",
     "express": "^4.17.1",
     "level": "^6.0.1",
-    "metiseth-optimism-contracts": "^1.0.1",
+    "metiseth-optimism-contracts": "^1.0.*",
     "node-fetch": "^2.6.1"
   },
   "devDependencies": {
