@@ -8,6 +8,7 @@ import {
   TransactionEntry,
 } from '../types/database-types'
 import { SimpleDB } from './simple-db'
+import {inspect} from 'util'
 
 const TRANSPORT_DB_KEYS = {
   ENQUEUE: `enqueue`,
@@ -35,6 +36,7 @@ export class TransportDB {
   }
 
   public async putEnqueueEntries(entries: EnqueueEntry[]): Promise<void> {
+    console.log(inspect(entries))
     await this._putEntries(TRANSPORT_DB_KEYS.ENQUEUE, entries)
   }
 
@@ -318,6 +320,7 @@ export class TransportDB {
   private async _getLatestEntry<TEntry extends Indexed>(
     key: string
   ): Promise<TEntry | null> {
+    console.log(key)
     return this._getEntryByIndex(key, await this._getLatestEntryIndex(key))
   }
 
