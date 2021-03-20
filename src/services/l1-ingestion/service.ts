@@ -302,7 +302,9 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
         for (const event of events) {
           // filter chainId
           if(!event.args._chainId || event.args._chainId != this.options.l2ChainId){
-            continue;
+            //0 for compatible with old no chanid api
+            if(event.args._chainId!=0)
+              continue;
           }
 
           const extraData = await handlers.getExtraData(
