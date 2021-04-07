@@ -25,21 +25,9 @@ import { handleEventsStateBatchAppended } from './handlers/state-batch-appended'
 import { L1DataTransportServiceOptions } from '../main/service'
 import { constants } from 'ethers'
 
-<<<<<<< HEAD
-export interface L1IngestionServiceOptions {
-  db: any
-  addressManager: string
-  confirmations: number
-  l1RpcProvider: string | JsonRpcProvider
-  pollingInterval: number
-  logsPerPollingInterval: number
-  dangerouslyCatchAllErrors?: boolean
-  l2ChainId: number
-=======
 export interface L1IngestionServiceOptions
   extends L1DataTransportServiceOptions {
   db: LevelUp
->>>>>>> 0401
 }
 
 export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
