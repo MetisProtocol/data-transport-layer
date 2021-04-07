@@ -1,6 +1,6 @@
 /* Imports: External */
-import { ctcCoder, ZERO_ADDRESS } from '@eth-optimism/core-utils'
-import { BigNumber, ethers } from 'ethers'
+import { ctcCoder } from '@eth-optimism/core-utils'
+import { BigNumber, constants, ethers } from 'ethers'
 
 /* Imports: Internal */
 import { TransportDB } from '../../../db/transport-db'
@@ -24,18 +24,19 @@ export const handleSequencerBlock = {
     stateRootEntry: StateRootEntry
   }> => {
     const transaction = block.transactions[0]
+    const transactionIndex =
+      transaction.index === null || transaction.index === undefined
+        ? BigNumber.from(transaction.blockNumber).toNumber() - 1
+        : BigNumber.from(transaction.index).toNumber()
 
     let transactionEntry: Partial<TransactionEntry> = {
-      index: BigNumber.from(transaction.index).toNumber(),
+      // Legacy support.
+      index: transactionIndex,
       batchIndex: null,
       blockNumber: BigNumber.from(transaction.l1BlockNumber).toNumber(),
       timestamp: BigNumber.from(transaction.l1Timestamp).toNumber(),
       queueOrigin: transaction.queueOrigin,
       type: parseTxType(transaction.txType),
-      queueIndex:
-        transaction.queueIndex === null
-          ? null
-          : BigNumber.from(transaction.queueIndex).toNumber(),
       confirmed: false,
     }
 
@@ -49,8 +50,9 @@ export const handleSequencerBlock = {
         gasLimit: BigNumber.from(transaction.gas).toNumber(),
         gasPrice: BigNumber.from(transaction.gasPrice).toNumber(), // ?
         nonce: BigNumber.from(transaction.nonce).toNumber(),
-        target: transaction.to || ZERO_ADDRESS, // ?
+        target: transaction.to || constants.AddressZero, // ?
         data: transaction.input,
+        type: transaction.txType,
       }
 
       transactionEntry = {
@@ -63,6 +65,7 @@ export const handleSequencerBlock = {
           transaction.txType
         ),
         decoded: decodedTransaction,
+        queueIndex: null,
       }
     } else {
       transactionEntry = {
@@ -72,11 +75,16 @@ export const handleSequencerBlock = {
         origin: ethers.utils.getAddress(transaction.l1TxOrigin),
         data: transaction.input,
         decoded: null,
+        queueIndex:
+          transaction.queueIndex === null ||
+          transaction.queueIndex === undefined
+            ? BigNumber.from(transaction.nonce).toNumber()
+            : BigNumber.from(transaction.queueIndex).toNumber(),
       }
     }
 
     const stateRootEntry: StateRootEntry = {
-      index: BigNumber.from(transaction.index).toNumber(),
+      index: transactionIndex,
       batchIndex: null,
       value: block.stateRoot,
       confirmed: false,

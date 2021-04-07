@@ -23,10 +23,10 @@ interface Bcfg {
     })
 
     const service = new L1DataTransportService({
-      db: config.str('dbPath', './db'),
+      dbPath: config.str('dbPath', './db'),
       port: config.uint('serverPort', 7878),
       hostname: config.str('serverHostname', 'localhost'),
-      confirmations: config.uint('confirmations', 12),
+      confirmations: config.uint('confirmations', 35),
       l1RpcProvider: config.str('l1RpcEndpoint'),
       addressManager: config.str('addressManager'),
       pollingInterval: config.uint('pollingInterval', 5000),
@@ -36,7 +36,7 @@ interface Bcfg {
         false
       ),
       l2RpcProvider: config.str('l2RpcEndpoint'),
-      l2ChainId: config.uint('l2ChainId', 69),
+      l2ChainId: config.uint('l2ChainId'),
       syncFromL1: config.bool('syncFromL1', true),
       syncFromL2: config.bool('syncFromL2', false),
       showUnconfirmedTransactions: config.bool('syncFromL2', false),
@@ -44,6 +44,11 @@ interface Bcfg {
         'transactionsPerPollingInterval',
         1000
       ),
+      legacySequencerCompatibility: config.bool(
+        'legacySequencerCompatibility',
+        false
+      ),
+      stopL2SyncAtBlock: config.uint('stopL2SyncAtBlock'),
     })
 
     await service.start()

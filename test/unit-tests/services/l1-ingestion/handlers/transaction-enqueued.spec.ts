@@ -1,10 +1,9 @@
-import { expect } from '../../../../setup'
+import { ethers, BigNumber } from 'ethers'
 
+import { expect } from '../../../../setup'
 import { handleEventsTransactionEnqueued } from '../../../../../src/services/l1-ingestion/handlers/transaction-enqueued'
-import { BigNumber } from 'ethers'
 
 const MAX_ITERATIONS = 128
-const BIG_NUMBER_ZERO = BigNumber.from(0)
 
 describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', () => {
   describe('getExtraData', () => {
@@ -22,29 +21,27 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
     // to test. We could add a lot more tests that guarantee the correctness of the provided input,
     // but it's probably better to get wider test coverage first.
 
-    it('should have a ctcIndex equal to null', async () => {
+    it('should have a ctcIndex equal to null', () => {
       const input1: [any, any] = [
         {
           blockNumber: 0,
           args: {
-            _queueIndex: BIG_NUMBER_ZERO,
-            _gasLimit: BIG_NUMBER_ZERO,
-            _timestamp: BIG_NUMBER_ZERO,
+            _queueIndex: ethers.constants.Zero,
+            _gasLimit: ethers.constants.Zero,
+            _timestamp: ethers.constants.Zero,
           },
         },
         null,
       ]
 
-      const output1 = await handleEventsTransactionEnqueued.parseEvent(
-        ...input1
-      )
+      const output1 = handleEventsTransactionEnqueued.parseEvent(...input1)
 
       const expected1 = null
 
       expect(output1).to.have.property('ctcIndex', expected1)
     })
 
-    it('should have a blockNumber equal to the integer value of the blockNumber parameter', async () => {
+    it('should have a blockNumber equal to the integer value of the blockNumber parameter', () => {
       for (
         let i = 0;
         i < Number.MAX_SAFE_INTEGER;
@@ -54,17 +51,15 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
           {
             blockNumber: i,
             args: {
-              _queueIndex: BIG_NUMBER_ZERO,
-              _gasLimit: BIG_NUMBER_ZERO,
-              _timestamp: BIG_NUMBER_ZERO,
+              _queueIndex: ethers.constants.Zero,
+              _gasLimit: ethers.constants.Zero,
+              _timestamp: ethers.constants.Zero,
             },
           },
           null,
         ]
 
-        const output1 = await handleEventsTransactionEnqueued.parseEvent(
-          ...input1
-        )
+        const output1 = handleEventsTransactionEnqueued.parseEvent(...input1)
 
         const expected1 = BigNumber.from(i).toNumber()
 
@@ -72,7 +67,7 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
       }
     })
 
-    it('should have an index equal to the integer value of the _queueIndex argument', async () => {
+    it('should have an index equal to the integer value of the _queueIndex argument', () => {
       for (
         let i = 0;
         i < Number.MAX_SAFE_INTEGER;
@@ -83,16 +78,14 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
             blockNumber: 0,
             args: {
               _queueIndex: BigNumber.from(i),
-              _gasLimit: BIG_NUMBER_ZERO,
-              _timestamp: BIG_NUMBER_ZERO,
+              _gasLimit: ethers.constants.Zero,
+              _timestamp: ethers.constants.Zero,
             },
           },
           null,
         ]
 
-        const output1 = await handleEventsTransactionEnqueued.parseEvent(
-          ...input1
-        )
+        const output1 = handleEventsTransactionEnqueued.parseEvent(...input1)
 
         const expected1 = BigNumber.from(i).toNumber()
 
@@ -100,7 +93,7 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
       }
     })
 
-    it('should have a gasLimit equal to the integer value of the _gasLimit argument', async () => {
+    it('should have a gasLimit equal to the integer value of the _gasLimit argument', () => {
       for (
         let i = 0;
         i < Number.MAX_SAFE_INTEGER;
@@ -110,17 +103,15 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
           {
             blockNumber: 0,
             args: {
-              _queueIndex: BIG_NUMBER_ZERO,
+              _queueIndex: ethers.constants.Zero,
               _gasLimit: BigNumber.from(i),
-              _timestamp: BIG_NUMBER_ZERO,
+              _timestamp: ethers.constants.Zero,
             },
           },
           null,
         ]
 
-        const output1 = await handleEventsTransactionEnqueued.parseEvent(
-          ...input1
-        )
+        const output1 = handleEventsTransactionEnqueued.parseEvent(...input1)
 
         const expected1 = BigNumber.from(i).toNumber()
 
@@ -128,7 +119,7 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
       }
     })
 
-    it('should have a timestamp equal to the integer value of the _timestamp argument', async () => {
+    it('should have a timestamp equal to the integer value of the _timestamp argument', () => {
       for (
         let i = 0;
         i < Number.MAX_SAFE_INTEGER;
@@ -138,17 +129,15 @@ describe('Event Handlers: OVM_CanonicalTransactionChain.TransactionEnqueued', ()
           {
             blockNumber: 0,
             args: {
-              _queueIndex: BIG_NUMBER_ZERO,
-              _gasLimit: BIG_NUMBER_ZERO,
+              _queueIndex: ethers.constants.Zero,
+              _gasLimit: ethers.constants.Zero,
               _timestamp: BigNumber.from(i),
             },
           },
           null,
         ]
 
-        const output1 = await handleEventsTransactionEnqueued.parseEvent(
-          ...input1
-        )
+        const output1 = handleEventsTransactionEnqueued.parseEvent(...input1)
 
         const expected1 = BigNumber.from(i).toNumber()
 

@@ -2,19 +2,18 @@
 import { BaseService } from '@eth-optimism/service-base'
 import { JsonRpcProvider } from '@ethersproject/providers'
 import colors from 'colors/safe'
+import { BigNumber } from 'ethers'
+import { LevelUp } from 'levelup'
 
 /* Imports: Internal */
 import { TransportDB } from '../../db/transport-db'
 import { sleep, toRpcHexString, validators } from '../../utils'
+import { L1DataTransportServiceOptions } from '../main/service'
 import { handleSequencerBlock } from './handlers/transaction'
 
-export interface L2IngestionServiceOptions {
-  db: any
-  l2RpcProvider: string | JsonRpcProvider
-  l2ChainId: number
-  pollingInterval: number
-  transactionsPerPollingInterval: number
-  dangerouslyCatchAllErrors?: boolean
+export interface L2IngestionServiceOptions
+  extends L1DataTransportServiceOptions {
+  db: LevelUp
 }
 
 export class L2IngestionService extends BaseService<L2IngestionServiceOptions> {
@@ -44,77 +43,105 @@ export class L2IngestionService extends BaseService<L2IngestionServiceOptions> {
       default: false,
       validate: validators.isBoolean,
     },
+    legacySequencerCompatibility: {
+      default: false,
+      validate: validators.isBoolean,
+    },
+    stopL2SyncAtBlock: {
+      default: Infinity,
+      validate: validators.isInteger,
+    },
   }
 
   private state: {
     db: TransportDB
     l2RpcProvider: JsonRpcProvider
-    highestSyncedL2BlockNumber: number
   } = {} as any
 
   protected async _init(): Promise<void> {
+    if (this.options.legacySequencerCompatibility) {
+      this.logger.info(
+        'Using legacy sync, this will be quite a bit slower than normal'
+      )
+    }
+
     this.state.db = new TransportDB(this.options.db)
 
     this.state.l2RpcProvider =
       typeof this.options.l2RpcProvider === 'string'
         ? new JsonRpcProvider(this.options.l2RpcProvider)
         : this.options.l2RpcProvider
-
-    // No need for writing anything to the database, latest transaction is a good guess of where
-    // to start. We won't overwrite any confirmed transactions, so this doesn't have to be exact.
-    const latestTransaction = await this.state.db.getLatestTransaction()
-    if (latestTransaction) {
-      this.state.highestSyncedL2BlockNumber = Math.max(
-        latestTransaction.index,
-        1
-      )
-      this.logger.info(
-        `Starting sync to sequencer blocks from height: ${this.state.highestSyncedL2BlockNumber}`
-      )
-    } else {
-      this.state.highestSyncedL2BlockNumber = 1
-    }
   }
 
   protected async _start(): Promise<void> {
     while (this.running) {
       try {
-        const currentL2Block = await this.state.l2RpcProvider.getBlockNumber()
+        const highestSyncedL2BlockNumber =
+          (await this.state.db.getHighestSyncedUnconfirmedBlock()) || 1
+
+        // Shut down if we're at the stop block.
+        if (
+          this.options.stopL2SyncAtBlock !== undefined &&
+          this.options.stopL2SyncAtBlock !== null &&
+          highestSyncedL2BlockNumber >= this.options.stopL2SyncAtBlock
+        ) {
+          this.logger.info(
+            "L2 sync is shutting down because we've reached your target block. Goodbye!"
+          )
+          return
+        }
+
+        let currentL2Block = await this.state.l2RpcProvider.getBlockNumber()
+
+        // Make sure we can't exceed the stop block.
+        if (
+          this.options.stopL2SyncAtBlock !== undefined &&
+          this.options.stopL2SyncAtBlock !== null
+        ) {
+          currentL2Block = Math.min(
+            currentL2Block,
+            this.options.stopL2SyncAtBlock
+          )
+        }
+
+        // Make sure we don't exceed the tip.
         const targetL2Block = Math.min(
-          this.state.highestSyncedL2BlockNumber +
+          highestSyncedL2BlockNumber +
             this.options.transactionsPerPollingInterval,
           currentL2Block
         )
 
         // We're already at the head, so no point in attempting to sync.
-        if (this.state.highestSyncedL2BlockNumber === targetL2Block) {
+        if (highestSyncedL2BlockNumber === targetL2Block) {
           await sleep(this.options.pollingInterval)
           continue
         }
 
         this.logger.info(
-          `Synchronizing unconfirmed transactions from Layer 2 (Optimistic Ethereum) from block ${colors.yellow(
-            `${this.state.highestSyncedL2BlockNumber}`
-          )} to block ${colors.yellow(`${targetL2Block}`)}`
+          'Synchronizing unconfirmed transactions from Layer 2 (Optimistic Ethereum)',
+          {
+            fromBlock: highestSyncedL2BlockNumber,
+            toBlock: targetL2Block,
+          }
         )
 
         // Synchronize by requesting blocks from the sequencer. Sync from L1 takes precedence.
         await this._syncSequencerBlocks(
-          this.state.highestSyncedL2BlockNumber,
+          highestSyncedL2BlockNumber,
           targetL2Block
         )
 
-        this.state.highestSyncedL2BlockNumber = targetL2Block
+        await this.state.db.setHighestSyncedUnconfirmedBlock(targetL2Block)
 
         if (
-          currentL2Block - this.state.highestSyncedL2BlockNumber <
+          currentL2Block - highestSyncedL2BlockNumber <
           this.options.transactionsPerPollingInterval
         ) {
           await sleep(this.options.pollingInterval)
         }
       } catch (err) {
         if (!this.running || this.options.dangerouslyCatchAllErrors) {
-          this.logger.error(`Caught an unhandled error: ${err}`)
+          this.logger.error('Caught an unhandled error', { err })
           await sleep(this.options.pollingInterval)
         } else {
           // TODO: Is this the best thing to do here?
@@ -133,11 +160,43 @@ export class L2IngestionService extends BaseService<L2IngestionServiceOptions> {
     startBlockNumber: number,
     endBlockNumber: number
   ): Promise<void> {
-    const blocks = await this.state.l2RpcProvider.send('eth_getBlockRange', [
-      toRpcHexString(startBlockNumber),
-      toRpcHexString(endBlockNumber),
-      true,
-    ])
+    if (startBlockNumber > endBlockNumber) {
+      this.logger.warn(
+        'Cannot query with start block number larger than end block number',
+        {
+          startBlockNumber,
+          endBlockNumber,
+        }
+      )
+      return
+    }
+
+    let blocks: any = []
+    if (this.options.legacySequencerCompatibility) {
+      const blockPromises = []
+      for (let i = startBlockNumber; i <= endBlockNumber; i++) {
+        blockPromises.push(
+          this.state.l2RpcProvider.send('eth_getBlockByNumber', [
+            toRpcHexString(i),
+            true,
+          ])
+        )
+      }
+
+      // Just making sure that the blocks will come back in increasing order.
+      blocks = (await Promise.all(blockPromises)).sort((a, b) => {
+        return (
+          BigNumber.from(a.number).toNumber() -
+          BigNumber.from(b.number).toNumber()
+        )
+      })
+    } else {
+      blocks = await this.state.l2RpcProvider.send('eth_getBlockRange', [
+        toRpcHexString(startBlockNumber),
+        toRpcHexString(endBlockNumber),
+        true,
+      ])
+    }
 
     for (const block of blocks) {
       const entry = await handleSequencerBlock.parseBlock(

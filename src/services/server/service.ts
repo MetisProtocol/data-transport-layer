@@ -4,11 +4,13 @@ import express, { Request, Response } from 'express'
 import cors from 'cors'
 import { BigNumber } from 'ethers'
 import { JsonRpcProvider } from '@ethersproject/providers'
+import { LevelUp } from 'levelup'
 
 /* Imports: Internal */
 import { TransportDB } from '../../db/transport-db'
 import {
   ContextResponse,
+  GasPriceResponse,
   EnqueueResponse,
   StateRootBatchResponse,
   StateRootResponse,
@@ -17,14 +19,11 @@ import {
   TransactionResponse,
 } from '../../types'
 import { validators } from '../../utils'
+import { L1DataTransportServiceOptions } from '../main/service'
 
-export interface L1TransportServerOptions {
-  db: any
-  port: number
-  hostname: string
-  confirmations: number
-  l1RpcProvider: string | JsonRpcProvider
-  showUnconfirmedTransactions: boolean
+export interface L1TransportServerOptions
+  extends L1DataTransportServiceOptions {
+  db: LevelUp
 }
 
 export class L1TransportServer extends BaseService<L1TransportServerOptions> {
@@ -81,7 +80,10 @@ export class L1TransportServer extends BaseService<L1TransportServerOptions> {
       this.options.port,
       this.options.hostname
     )
-    this.logger.info(`Server listening on port: ${this.options.port}`)
+    this.logger.info('Server started and listening', {
+      host: this.options.hostname,
+      port: this.options.port,
+    })
   }
 
   protected async _stop(): Promise<void> {
@@ -116,10 +118,24 @@ export class L1TransportServer extends BaseService<L1TransportServerOptions> {
     // TODO: Add a different function to allow for removing routes.
 
     this.state.app[method](route, async (req, res) => {
+      const start = Date.now()
       try {
-        this.logger.info(`${req.ip}: ${method.toUpperCase()} ${req.path}`)
-        return res.json(await handler(req, res))
+        const json = await handler(req, res)
+        const elapsed = Date.now() - start
+        this.logger.info('Served HTTP Request', {
+          method: req.method,
+          url: req.url,
+          elapsed,
+        })
+        return res.json(json)
       } catch (e) {
+        const elapsed = Date.now() - start
+        this.logger.info('Failed HTTP Request', {
+          method: req.method,
+          url: req.url,
+          elapsed,
+          msg: e.toString(),
+        })
         return res.status(400).json({
           error: e.toString(),
         })
@@ -167,6 +183,18 @@ export class L1TransportServer extends BaseService<L1TransportServerOptions> {
             syncing: false,
             currentTransactionIndex: currentL2Block.index,
           }
+        }
+      }
+    )
+
+    this._registerRoute(
+      'get',
+      '/eth/gasprice',
+      async (): Promise<GasPriceResponse> => {
+        const gasPrice = await this.state.l1RpcProvider.getGasPrice()
+
+        return {
+          gasPrice: gasPrice.toString(),
         }
       }
     )
@@ -281,15 +309,18 @@ export class L1TransportServer extends BaseService<L1TransportServerOptions> {
       async (): Promise<TransactionResponse> => {
         let transaction = await this.state.db.getLatestFullTransaction()
         if (this.options.showUnconfirmedTransactions) {
-          const unconfirmedTransaction = await this.state.db.getLatestUnconfirmedTransaction()
-
+          const latestUnconfirmedTx = await this.state.db.getLatestUnconfirmedTransaction()
           if (
-            unconfirmedTransaction !== null &&
-            (transaction === null ||
-              transaction.index < unconfirmedTransaction.index)
+            transaction === null ||
+            transaction === undefined ||
+            latestUnconfirmedTx.index >= transaction.index
           ) {
-            transaction = unconfirmedTransaction
+            transaction = latestUnconfirmedTx
           }
+        }
+
+        if (transaction === null) {
+          transaction = await this.state.db.getLatestFullTransaction()
         }
 
         if (transaction === null) {
@@ -314,21 +345,17 @@ export class L1TransportServer extends BaseService<L1TransportServerOptions> {
       'get',
       '/transaction/index/:index',
       async (req): Promise<TransactionResponse> => {
-        let transaction = await this.state.db.getFullTransactionByIndex(
-          BigNumber.from(req.params.index).toNumber()
-        )
+        let transaction = null
         if (this.options.showUnconfirmedTransactions) {
-          const unconfirmedTransaction = await this.state.db.getUnconfirmedTransactionByIndex(
+          transaction = await this.state.db.getUnconfirmedTransactionByIndex(
             BigNumber.from(req.params.index).toNumber()
           )
+        }
 
-          if (
-            unconfirmedTransaction !== null &&
-            (transaction === null ||
-              transaction.index < unconfirmedTransaction.index)
-          ) {
-            transaction = unconfirmedTransaction
-          }
+        if (transaction === null) {
+          transaction = await this.state.db.getFullTransactionByIndex(
+            BigNumber.from(req.params.index).toNumber()
+          )
         }
 
         if (transaction === null) {
@@ -409,14 +436,18 @@ export class L1TransportServer extends BaseService<L1TransportServerOptions> {
       async (): Promise<StateRootResponse> => {
         let stateRoot = await this.state.db.getLatestStateRoot()
         if (this.options.showUnconfirmedTransactions) {
-          const unconfirmedStateRoot = await this.state.db.getLatestUnconfirmedStateRoot()
-
+          const latestUnconfirmedStateRoot = await this.state.db.getLatestUnconfirmedStateRoot()
           if (
-            unconfirmedStateRoot !== null &&
-            (stateRoot === null || stateRoot.index < unconfirmedStateRoot.index)
+            stateRoot === null ||
+            stateRoot === undefined ||
+            latestUnconfirmedStateRoot.index >= stateRoot.index
           ) {
-            stateRoot = unconfirmedStateRoot
+            stateRoot = latestUnconfirmedStateRoot
           }
+        }
+
+        if (stateRoot === null) {
+          stateRoot = await this.state.db.getLatestStateRoot()
         }
 
         if (stateRoot === null) {
@@ -441,20 +472,17 @@ export class L1TransportServer extends BaseService<L1TransportServerOptions> {
       'get',
       '/stateroot/index/:index',
       async (req): Promise<StateRootResponse> => {
-        let stateRoot = await this.state.db.getStateRootByIndex(
-          BigNumber.from(req.params.index).toNumber()
-        )
+        let stateRoot = null
         if (this.options.showUnconfirmedTransactions) {
-          const unconfirmedStateRoot = await this.state.db.getUnconfirmedStateRootByIndex(
+          stateRoot = await this.state.db.getUnconfirmedStateRootByIndex(
             BigNumber.from(req.params.index).toNumber()
           )
+        }
 
-          if (
-            unconfirmedStateRoot !== null &&
-            (stateRoot === null || stateRoot.index < unconfirmedStateRoot.index)
-          ) {
-            stateRoot = unconfirmedStateRoot
-          }
+        if (stateRoot === null) {
+          stateRoot = await this.state.db.getStateRootByIndex(
+            BigNumber.from(req.params.index).toNumber()
+          )
         }
 
         if (stateRoot === null) {
