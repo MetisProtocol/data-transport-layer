@@ -4,9 +4,10 @@ import { fromHexString } from '@eth-optimism/core-utils'
 import { JsonRpcProvider } from '@ethersproject/providers'
 import colors from 'colors/safe'
 import { LevelUp } from 'levelup'
+import level from 'level'
 
 /* Imports: Internal */
-import { TransportDB } from '../../db/transport-db'
+import { TransportDB, TransportDBMapHolder, TransportDBMap} from '../../db/transport-db'
 import {
   OptimismContracts,
   sleep,
@@ -28,8 +29,8 @@ import { constants } from 'ethers'
 export interface L1IngestionServiceOptions
   extends L1DataTransportServiceOptions {
   db: LevelUp
+  dbs: TransportDBMapHolder
 }
-
 export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
   protected name = 'L1 Ingestion Service'
 
@@ -68,6 +69,7 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
 
   private state: {
     db: TransportDB
+    dbs: TransportDBMap
     contracts: OptimismContracts
     l1RpcProvider: JsonRpcProvider
     startingL1BlockNumber: number
@@ -75,7 +77,7 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
 
   protected async _init(): Promise<void> {
     this.state.db = new TransportDB(this.options.db)
-
+    this.state.dbs = {}
     this.state.l1RpcProvider =
       typeof this.options.l1RpcProvider === 'string'
         ? new JsonRpcProvider(this.options.l1RpcProvider)
@@ -300,19 +302,21 @@ export class L1IngestionService extends BaseService<L1IngestionServiceOptions> {
         const tick = Date.now()
 
         for (const event of events) {
-          // filter chainId
-          if(!event.args._chainId || event.args._chainId != this.options.l2ChainId){
-            //0 for compatible with old no chanid api
-            if(event.args._chainId!=0)
-              continue;
-          }
-
+          
           const extraData = await handlers.getExtraData(
             event,
             this.state.l1RpcProvider
           )
           const parsedEvent = await handlers.parseEvent(event, extraData)
-          await handlers.storeEvent(parsedEvent, this.state.db)
+          
+          // filter chainId
+          var chainId = event.args._chainId.toNumber()
+          var db=this.state.db
+          if(chainId&&chainId!=0){
+             db = await this.options.dbs.getTransportDbByChainId(chainId)
+          }
+          
+          await handlers.storeEvent(parsedEvent, db)
         }
 
         const tock = Date.now()
